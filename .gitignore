@@ -1,0 +1,41 @@
+# IDE & Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment & Secrets
+.env
+.env.backup
+.env.production
+.env.local
+
+# Dependency directories (if any local builds)
+node_modules/
+vendor/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Logs & Database
+*.log
+*.sqlite-journal
+
+# Temporary / Scratch
+tmp/
+temp/

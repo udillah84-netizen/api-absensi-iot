@@ -1,0 +1,141 @@
+{
+  "info": {
+    "_postman_id": "8e006f4f-4bac-45cb-92e3-adbe8afce08f",
+    "name": "IoT Attendance API (ESP32 Smart Box)",
+    "description": "Koleksi Postman untuk pengujian endpoint Mesin Absensi IoT (RFID + Barcode/QR).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Scan RFID - Sukses Hadir",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"A1B2C3D4\",\n  \"device_id\": \"{{device_id}}\",\n  \"jenis\": \"RFID\",\n  \"scanned_at\": \"2026-08-30T07:15:00+07:00\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/scan",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "scan"]
+        }
+      }
+    },
+    {
+      "name": "2. Scan Barcode / QR - Sukses Hadir",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"SISWA-2026-001\",\n  \"device_id\": \"{{device_id}}\",\n  \"jenis\": \"BARCODE\",\n  \"scanned_at\": \"2026-08-30T07:15:00+07:00\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/scan",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "scan"]
+        }
+      }
+    },
+    {
+      "name": "3. Scan Kartu - Terlambat",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"E5F6G7H8\",\n  \"device_id\": \"{{device_id}}\",\n  \"jenis\": \"RFID\",\n  \"scanned_at\": \"2026-08-30T07:45:00+07:00\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/scan",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "scan"]
+        }
+      }
+    },
+    {
+      "name": "4. Scan Kartu - Belum Terdaftar (404)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"UNKNOWN_CARD_999\",\n  \"device_id\": \"{{device_id}}\",\n  \"jenis\": \"RFID\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/scan",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "scan"]
+        }
+      }
+    },
+    {
+      "name": "5. Heartbeat Routine",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"wifi_rssi\": -65,\n  \"fw_version\": \"v2.0.0\",\n  \"scans_today\": 120\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/heartbeat",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "heartbeat"]
+        }
+      }
+    },
+    {
+      "name": "6. Device Config & Schedules",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"device_id\": \"{{device_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/config",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "config"]
+        }
+      }
+    },
+    {
+      "name": "7. Firmware OTA Update Check",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Device-Token", "value": "{{secret_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/iot/firmware-check?current_version=v2.0.0",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "iot", "firmware-check"],
+          "query": [
+            { "key": "current_version", "value": "v2.0.0" }
+          ]
+        }
+      }
+    }
+  ]
+}

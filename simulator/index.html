@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚡ Mesin Absensi IoT ESP32 - Interactive Hardware Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon">📡</div>
+        <div>
+          <h1>IoT Smart Box ESP32 Simulator</h1>
+          <p class="subtitle">Simulator Pengujian Mesin Absensi Hardware (RFID + Barcode/QR 2D) Firmware v2.0.0+</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="badge badge-firmware">FW: v2.0.0</span>
+        <button id="btn-sound-toggle" class="btn btn-sm btn-outline">🔊 Sound: ON</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-grid">
+      <!-- Left Column: The Physical Hardware Box -->
+      <section class="card hardware-section">
+        <div class="section-title">
+          <h2>📦 Unit Perangkat Keras (Smart Box)</h2>
+          <span class="live-pill"><span class="pulse"></span> LIVE SIMULATOR</span>
+        </div>
+
+        <div class="smart-box-chassis">
+          <!-- Status LEDs -->
+          <div class="led-panel">
+            <div class="led-item">
+              <div class="led led-red active" id="led-pwr" title="Power 5V"></div>
+              <span>PWR</span>
+            </div>
+            <div class="led-item">
+              <div class="led led-green active" id="led-wifi" title="WiFi 2.4GHz"></div>
+              <span id="label-wifi">WIFI</span>
+            </div>
+            <div class="led-item">
+              <div class="led led-blue" id="led-scan" title="Scan Pulse"></div>
+              <span>ACT</span>
+            </div>
+            <div class="led-item">
+              <div class="led led-orange" id="led-sd" title="SD Card Buffer"></div>
+              <span>SD</span>
+            </div>
+          </div>
+
+          <!-- LCD 16x2 Display Frame -->
+          <div class="lcd-frame">
+            <div class="lcd-screen" id="lcd-screen">
+              <div class="lcd-line" id="lcd-line-1">ESP32 SMART BOX </div>
+              <div class="lcd-line" id="lcd-line-2">READY TO SCAN...</div>
+            </div>
+          </div>
+
+          <!-- Hardware Sensor Zones -->
+          <div class="sensors-area">
+            <!-- RFID Reader Area -->
+            <div class="sensor-zone rfid-zone" id="zone-rfid">
+              <div class="sensor-icon">💳</div>
+              <div class="sensor-name">MFRC522 RFID Sensor</div>
+              <div class="sensor-sub">MIFARE 13.56 MHz (VSPI)</div>
+            </div>
+
+            <!-- 2D Barcode Scanner Area -->
+            <div class="sensor-zone barcode-zone" id="zone-barcode">
+              <div class="sensor-icon">📷</div>
+              <div class="sensor-name">2D Barcode / QR Optics</div>
+              <div class="sensor-sub">UART 9600 Baud (GM65/67)</div>
+            </div>
+          </div>
+
+          <!-- Buzzer Grill -->
+          <div class="buzzer-grill">
+            <div class="grill-hole"></div>
+            <div class="grill-hole"></div>
+            <div class="grill-hole"></div>
+            <span class="buzzer-label">ACTIVE BUZZER 5V</span>
+          </div>
+        </div>
+
+        <!-- Quick Tap Buttons -->
+        <div class="quick-test-section">
+          <h3>⚡ Uji Cepat Kartu & Barcode (Presets):</h3>
+          <div class="preset-grid">
+            <button class="btn btn-preset" onclick="simulateScan('A1B2C3D4', 'RFID', 'Ahmad Fauzi (Siswa)')">
+              <span class="preset-tag rfid">RFID</span> Ahmad Fauzi
+              <span class="preset-code">A1B2C3D4</span>
+            </button>
+            <button class="btn btn-preset" onclick="simulateScan('E5F6G7H8', 'RFID', 'Budi Santoso (Siswa)')">
+              <span class="preset-tag rfid">RFID</span> Budi Santoso
+              <span class="preset-code">E5F6G7H8</span>
+            </button>
+            <button class="btn btn-preset" onclick="simulateScan('CCDD1122', 'RFID', 'Drs. Hendra (Guru)')">
+              <span class="preset-tag rfid">RFID</span> Drs. Hendra (Guru)
+              <span class="preset-code">CCDD1122</span>
+            </button>
+            <button class="btn btn-preset" onclick="simulateScan('SISWA-2026-001', 'BARCODE', 'QR Ahmad Fauzi')">
+              <span class="preset-tag qr">QR</span> QR Ahmad Fauzi
+              <span class="preset-code">SISWA-2026-001</span>
+            </button>
+            <button class="btn btn-preset" onclick="simulateScan('SISWA-2026-002', 'BARCODE', 'QR Budi Santoso')">
+              <span class="preset-tag qr">QR</span> QR Budi Santoso
+              <span class="preset-code">SISWA-2026-002</span>
+            </button>
+            <button class="btn btn-preset btn-danger-preset" onclick="simulateScan('UNKNOWN9999', 'RFID', 'Kartu Tidak Terdaftar')">
+              <span class="preset-tag error">TEST</span> Kartu Tidak Terdaftar
+              <span class="preset-code">UNKNOWN9999</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Controls, Config & HTTP Inspector -->
+      <section class="card config-section">
+        <div class="section-title">
+          <h2>⚙️ Konfigurasi Target & Simulator</h2>
+        </div>
+
+        <form id="simulator-form" onsubmit="handleManualScan(event)">
+          <!-- Target Endpoint Configuration -->
+          <div class="form-group">
+            <label for="target-url">🌐 Target API Scan URL:</label>
+            <div class="input-with-action">
+              <input type="url" id="target-url" value="http://localhost:8000/api/v1/iot/scan" required>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="presetUrl('laravel')">Laravel (8000)</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="presetUrl('express')">Node (3000)</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="presetUrl('php')">PHP Native</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label for="secret-token">🔑 X-Device-Token:</label>
+              <input type="text" id="secret-token" value="tok_rahasia_mesin_anda" required>
+            </div>
+            <div class="form-group col">
+              <label for="device-id">🆔 Device ID:</label>
+              <input type="text" id="device-id" value="DEV-GERBANG-01" required>
+            </div>
+            <div class="form-group col">
+              <label for="hardware-variant">🧩 Varian Hardware:</label>
+              <select id="hardware-variant" onchange="changeHardwareVariant(this.value)">
+                <option value="COMBO" selected>Combo (RFID + Barcode)</option>
+                <option value="RFID">Hanya RFID MFRC522</option>
+                <option value="BARCODE">Hanya Barcode / QR 2D</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Manual Scan Input -->
+          <div class="manual-scan-box">
+            <label for="manual-code">🔍 Input Manual (UID RFID / Isi Barcode):</label>
+            <div class="input-with-action">
+              <input type="text" id="manual-code" placeholder="Contoh: A1B2C3D4 atau SISWA-001">
+              <select id="manual-jenis">
+                <option value="RFID">RFID</option>
+                <option value="BARCODE">BARCODE / QR</option>
+              </select>
+              <button type="submit" class="btn btn-primary" id="btn-scan-submit">⚡ Kirim Scan</button>
+            </div>
+          </div>
+
+          <!-- Hardware Utility Controls -->
+          <div class="hardware-actions">
+            <button type="button" class="btn btn-outline" onclick="sendHeartbeat()">💓 Kirim Heartbeat (Ping)</button>
+            <button type="button" class="btn btn-outline" id="btn-toggle-offline" onclick="toggleOfflineMode()">📶 Mode: ONLINE</button>
+            <button type="button" class="btn btn-outline btn-warning" id="btn-sync-offline" onclick="syncOfflineQueue()" style="display:none;">📤 Sync Buffer (<span id="offline-count">0</span>)</button>
+            <button type="button" class="btn btn-outline" onclick="resetLcd()">🔄 Reset LCD</button>
+          </div>
+        </form>
+
+        <!-- Live HTTP Request / Response Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <h3>📡 Live HTTP Inspector</h3>
+            <span id="http-status-badge" class="badge">Idle</span>
+          </div>
+          <div class="inspector-tabs">
+            <button class="tab active" onclick="switchTab('tab-response')">Response JSON</button>
+            <button class="tab" onclick="switchTab('tab-request')">Request Payload</button>
+            <button class="tab" onclick="switchTab('tab-logs')">Log Aktivitas (<span id="log-count">0</span>)</button>
+          </div>
+          <div class="tab-content" id="tab-response">
+            <pre><code id="json-response">// Hasil response dari server akan tampil di sini...</code></pre>
+          </div>
+          <div class="tab-content" id="tab-request" style="display: none;">
+            <pre><code id="json-request">// Data request payload...</code></pre>
+          </div>
+          <div class="tab-content" id="tab-logs" style="display: none;">
+            <div class="logs-container" id="logs-container">
+              <div class="log-entry">Simulator dimulai. Siap melakukan pengujian.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Mesin Absensi Smart Box IoT ESP32 Starter Kit &bull; Dilengkapi Dual-Core FreeRTOS, Offline SD Buffer & Web Audio Feedback</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
