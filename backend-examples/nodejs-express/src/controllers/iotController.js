@@ -137,6 +137,18 @@ exports.scan = (req, res) => {
 };
 
 exports.heartbeat = (req, res) => {
+  const { device_id, wifi_rssi, fw_version, scans_today } = req.body;
+  if (device_id && db.devices) {
+    const dev = db.devices.find((d) => d.device_id === device_id);
+    if (dev) {
+      dev.status = 'online';
+      dev.last_heartbeat = new Date();
+      dev.wifi_rssi = wifi_rssi;
+      dev.scans_today = scans_today;
+      dev.firmware_version = fw_version || dev.firmware_version;
+    }
+  }
+
   return res.json({
     success: true,
     server_time: new Date().toISOString(),
@@ -146,9 +158,17 @@ exports.heartbeat = (req, res) => {
 };
 
 exports.config = (req, res) => {
+  const deviceId = req.body.device_id || 'DEV-GERBANG-01';
   return res.json({
     success: true,
+    nama_lembaga: 'SMK NEGERI 1 BOGOR',
+    tipe_sensor: 'COMBO',
+    standby_text: 'SILAKAN ABSEN',
     server_time: new Date().toISOString(),
+    device: {
+      device_id: deviceId,
+      nama: 'Mesin Absensi Utama',
+    },
     schedules: db.settings,
   });
 };

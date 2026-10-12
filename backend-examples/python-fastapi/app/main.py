@@ -43,6 +43,10 @@ class HeartbeatPayload(BaseModel):
     device_id: str
     wifi_rssi: Optional[int] = None
     fw_version: Optional[str] = "v2.0.0"
+    scans_today: Optional[int] = 0
+
+class ConfigPayload(BaseModel):
+    device_id: Optional[str] = "DEV-GERBANG-01"
 
 @app.get("/api/v1/iot/ping")
 def ping():
@@ -119,4 +123,32 @@ def heartbeat(payload: HeartbeatPayload, x_device_token: Optional[str] = Header(
         "server_time": datetime.now().isoformat(),
         "heartbeat_interval": 60,
         "message": "Heartbeat OK",
+    }
+
+@app.post("/api/v1/iot/config")
+def get_config(payload: ConfigPayload, x_device_token: Optional[str] = Header(None, alias="X-Device-Token")):
+    if x_device_token != IOT_SECRET_TOKEN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    return {
+        "success": True,
+        "nama_lembaga": "SMK NEGERI 1 BOGOR",
+        "tipe_sensor": "COMBO",
+        "standby_text": "SILAKAN ABSEN",
+        "server_time": datetime.now().isoformat(),
+        "device": {
+            "device_id": payload.device_id,
+            "nama": "Mesin Absensi Utama",
+        },
+        "schedules": {
+            "siswa": {
+                "jam_masuk": "07:00",
+                "batas_terlambat": "07:30",
+                "jam_pulang": "14:00"
+            },
+            "pegawai": {
+                "jam_masuk": "07:30",
+                "batas_terlambat": "08:00",
+                "jam_pulang": "16:00"
+            }
+        }
     }

@@ -350,6 +350,47 @@ async function sendHeartbeat() {
 }
 
 /**
+ * Fetch Device Config (Booting Simulation)
+ */
+async function fetchConfig() {
+  getAudioContext();
+  const targetUrl = document.getElementById('target-url').value.trim().replace(/\/scan\/?$/, '/config');
+  const secretToken = document.getElementById('secret-token').value.trim();
+  const deviceId = document.getElementById('device-id').value.trim();
+
+  addLog('⚙️ Mengambil konfigurasi perangkat (Booting)...');
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Token': secretToken
+      },
+      body: JSON.stringify({
+        device_id: deviceId
+      })
+    });
+
+    const data = await response.json();
+    jsonResponseEl.textContent = JSON.stringify(data, null, 2);
+    addLog(`⚙️ Config response: ${JSON.stringify(data)}`);
+    if (data.success) {
+      const line1 = data.nama_lembaga || 'CONFIG OK';
+      const line2 = data.standby_text || 'READY TO SCAN';
+      setLcd(line1, line2, 5);
+      playTone(2200, 100);
+      addLog(`✅ Config diterima: ${line1} | Standby: ${line2}`);
+    } else {
+      setLcd('CONFIG REJECTED', (data.message || 'FAILED').substring(0, 16), 3);
+      Buzzer.error();
+    }
+  } catch (e) {
+    addLog(`❌ Fetch config failed: ${e.message}`, 'error');
+  }
+}
+
+/**
  * Toggle Offline Mode
  */
 function toggleOfflineMode() {

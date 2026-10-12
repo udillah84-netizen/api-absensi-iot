@@ -16,7 +16,11 @@ class AttendanceDevice extends Model
         'nama',
         'lokasi',
         'token',
+        'tipe_sensor',
         'status',
+        'wifi_rssi',
+        'scans_today',
+        'standby_text_override',
         'last_heartbeat',
         'ip_address',
         'firmware_version',
@@ -24,6 +28,8 @@ class AttendanceDevice extends Model
 
     protected $casts = [
         'last_heartbeat' => 'datetime',
+        'wifi_rssi'      => 'integer',
+        'scans_today'    => 'integer',
     ];
 
     protected static function boot()
@@ -37,6 +43,9 @@ class AttendanceDevice extends Model
             if (empty($device->device_id)) {
                 $device->device_id = 'DEV-' . strtoupper(substr(uniqid(), -6));
             }
+            if (empty($device->tipe_sensor)) {
+                $device->tipe_sensor = 'COMBO';
+            }
         });
     }
 
@@ -45,15 +54,55 @@ class AttendanceDevice extends Model
      */
     public function isOnline(): bool
     {
-        $timeout = config('iot.heartbeat_timeout_minutes', 5);
+        $timeout = config('iot.heartbeat_timeout_minutes', 3);
         return $this->last_heartbeat && $this->last_heartbeat->diffInMinutes(now()) < $timeout;
     }
 
     /**
-     * Memperbarui timestamp heartbeat dan status perangkat
+     * Mendapatkan kualitas sinyal WiFi dalam teks dan persentase
      */
-    public function updateHeartbeat(?string $ip = null, ?string $firmware = null): void
+    public function getSignalQualityAttribute(): array
     {
+        $rssi = $this->wifi_rssi;
+        if ($rssi === null) {
+            return ['percentage' => 0, 'label' => 'Tidak Ada Sinyal', 'color' => 'slate'];
+        }
+
+        // Formula persentase kualitas sinyal WiFi dBm (-100 dBm = 0%, -50 dBm = 100%)
+        $quality = 2 * ($rssi + 100);
+        $quality = max(0, min(100, $quality));
+
+        if ($rssi >= -60) {
+            $label = 'Sangat Bagus';
+            $color = 'emerald';
+        } elseif ($rssi >= -75) {
+            $label = 'Bagus';
+            $color = 'teal';
+        } elseif ($rssi >= -85) {
+            $label = 'Cukup';
+            $color = 'amber';
+        } else {
+            $label = 'Lemah';
+            $color = 'rose';
+        }
+
+        return [
+            'percentage' => $quality,
+            'label'      => $label,
+            'color'      => $color,
+            'dbm'        => $rssi,
+        ];
+    }
+
+    /**
+     * Memperbarui timestamp heartbeat, sinyal, dan status perangkat
+     */
+    public function updateHeartbeat(
+        ?string $ip = null,
+        ?string $firmware = null,
+        ?int $wifiRssi = null,
+        ?int $scansToday = null
+    ): void {
         $data = [
             'status'         => 'online',
             'last_heartbeat' => now(),
@@ -64,6 +113,12 @@ class AttendanceDevice extends Model
         }
         if ($firmware) {
             $data['firmware_version'] = $firmware;
+        }
+        if ($wifiRssi !== null) {
+            $data['wifi_rssi'] = $wifiRssi;
+        }
+        if ($scansToday !== null) {
+            $data['scans_today'] = $scansToday;
         }
 
         $this->update($data);

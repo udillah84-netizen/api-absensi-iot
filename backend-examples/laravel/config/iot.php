@@ -15,6 +15,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Identitas Lembaga & Pesan Standby LCD 16x2
+    |--------------------------------------------------------------------------
+    |
+    | Nama Lembaga / Sekolah akan ditampilkan pada Baris 1 LCD Mesin ESP32
+    | (maksimal 16 karakter). Standby text ditampilkan pada Baris 2 LCD.
+    |
+    */
+    'institution_name' => env('IOT_INSTITUTION_NAME', 'SMK NEGERI 1 BOGOR'),
+    'standby_text'     => env('IOT_STANDBY_TEXT', 'SILAKAN ABSEN'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Anti-Duplicate Tap Window (Detik)
     |--------------------------------------------------------------------------
     |

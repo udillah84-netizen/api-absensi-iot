@@ -19,7 +19,11 @@ define('IOT_SECRET_TOKEN', getenv('IOT_SECRET_TOKEN') ?: 'tok_rahasia_mesin_anda
 // 3. Waktu Proteksi Anti-Duplicate Tap (dalam detik)
 define('ANTI_DUPLICATE_WINDOW', 30);
 
-// 4. Jadwal Default Absensi (Jika tidak menggunakan data dinamis dari tabel settings)
+// 4. Identitas Lembaga & Tampilan LCD 16x2
+define('NAMA_LEMBAGA', getenv('NAMA_LEMBAGA') ?: 'SMK NEGERI 1 BOGOR');
+define('STANDBY_TEXT', getenv('STANDBY_TEXT') ?: 'SILAKAN ABSEN');
+
+// 5. Jadwal Default Absensi (Jika tidak menggunakan data dinamis dari tabel settings)
 define('DEFAULT_JAM_MASUK', '07:00:00');
 define('DEFAULT_BATAS_TERLAMBAT', '07:30:00');
 define('DEFAULT_JAM_PULANG', '14:00:00');

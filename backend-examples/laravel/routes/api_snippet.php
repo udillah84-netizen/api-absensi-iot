@@ -46,4 +46,17 @@ Route::prefix('v1/iot')->group(function () {
     // 3. Endpoint Live Monitoring Feed (Untuk polling dashboard/TV Lobi)
     Route::get('/monitor/data', [IotAttendanceController::class, 'liveMonitorData'])
         ->name('iot.attendance.monitor.data');
+
+    // 4. Endpoint Manajemen Perangkat & Telemetri Admin
+    Route::get('/devices/data', [IotAttendanceController::class, 'deviceMonitoringData'])
+        ->name('iot.devices.data');
+
+    Route::post('/settings/save', [IotAttendanceController::class, 'saveSettings'])
+        ->name('iot.settings.save');
+
+    Route::post('/cards/enroll', [IotAttendanceController::class, 'enrollCard'])
+        ->name('iot.cards.enroll');
+
+    Route::delete('/cards/unregistered/{id}', [IotAttendanceController::class, 'deleteUnregisteredCard'])
+        ->name('iot.cards.unregistered.delete');
 });

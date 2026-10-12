@@ -13,14 +13,24 @@ ON DUPLICATE KEY UPDATE
     batas_terlambat = VALUES(batas_terlambat),
     jam_pulang = VALUES(jam_pulang);
 
--- 2. Pendaftaran Perangkat IoT Percobaan
-INSERT INTO attendance_devices (device_id, nama, lokasi, token, status, firmware_version)
+-- 2. Setting Profil Lembaga & Standby LCD Mesin
+INSERT INTO iot_settings (id, nama_lembaga, standby_text, timezone, duplicate_window_seconds)
 VALUES 
-('DEV-GERBANG-01', 'Smart Box Gerbang Depan', 'Pintu Masuk Utama', 'tok_rahasia_mesin_anda', 'online', 'v2.0.0'),
-('DEV-KANTOR-01', 'Mesin Absensi Guru & Staf', 'Lobi Kantor Guru', 'tok_kantor_guru_secret', 'offline', 'v2.0.0')
+(1, 'SMK NEGERI 1 BOGOR', 'SILAKAN ABSEN', 'Asia/Jakarta', 30)
+ON DUPLICATE KEY UPDATE 
+    nama_lembaga = VALUES(nama_lembaga),
+    standby_text = VALUES(standby_text);
+
+-- 3. Pendaftaran Perangkat IoT Percobaan
+INSERT INTO attendance_devices (device_id, nama, lokasi, token, status, wifi_rssi, scans_today, firmware_version)
+VALUES 
+('DEV-GERBANG-01', 'Smart Box Gerbang Depan', 'Pintu Masuk Utama', 'tok_rahasia_mesin_anda', 'online', -62, 142, 'v2.0.0'),
+('DEV-KANTOR-01', 'Mesin Absensi Guru & Staf', 'Lobi Kantor Guru', 'tok_kantor_guru_secret', 'offline', -78, 0, 'v2.0.0')
 ON DUPLICATE KEY UPDATE 
     nama = VALUES(nama),
-    token = VALUES(token);
+    token = VALUES(token),
+    wifi_rssi = VALUES(wifi_rssi),
+    scans_today = VALUES(scans_today);
 
 -- 3. Data Pengguna Percobaan (Siswa & Karyawan dengan UID RFID & Barcode)
 INSERT INTO users (name, email, rfid_uid, barcode_uid, identifier_number, role, department, is_active)

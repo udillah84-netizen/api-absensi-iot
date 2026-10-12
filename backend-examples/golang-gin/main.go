@@ -16,9 +16,14 @@ type ScanRequest struct {
 }
 
 type HeartbeatRequest struct {
-	DeviceID  string `json:"device_id" binding:"required"`
-	WifiRSSI  int    `json:"wifi_rssi"`
-	FwVersion string `json:"fw_version"`
+	DeviceID   string `json:"device_id" binding:"required"`
+	WifiRSSI   int    `json:"wifi_rssi"`
+	FwVersion  string `json:"fw_version"`
+	ScansToday int    `json:"scans_today"`
+}
+
+type ConfigRequest struct {
+	DeviceID string `json:"device_id"`
 }
 
 func main() {
@@ -87,6 +92,39 @@ func main() {
 					"server_time":        time.Now().Format(time.RFC3339),
 					"heartbeat_interval": 60,
 					"message":            "Heartbeat OK",
+				})
+			})
+
+			protected.POST("/config", func(c *gin.Context) {
+				var req ConfigRequest
+				c.ShouldBindJSON(&req)
+				devID := req.DeviceID
+				if devID == "" {
+					devID = "DEV-GERBANG-01"
+				}
+
+				c.JSON(http.StatusOK, gin.H{
+					"success":      true,
+					"nama_lembaga": "SMK NEGERI 1 BOGOR",
+					"tipe_sensor":  "COMBO",
+					"standby_text": "SILAKAN ABSEN",
+					"server_time":  time.Now().Format(time.RFC3339),
+					"device": gin.H{
+						"device_id": devID,
+						"nama":      "Mesin Absensi Utama",
+					},
+					"schedules": gin.H{
+						"siswa": gin.H{
+							"jam_masuk":       "07:00",
+							"batas_terlambat": "07:30",
+							"jam_pulang":      "14:00",
+						},
+						"pegawai": gin.H{
+							"jam_masuk":       "07:30",
+							"batas_terlambat": "08:00",
+							"jam_pulang":      "16:00",
+						},
+					},
 				})
 			})
 		}

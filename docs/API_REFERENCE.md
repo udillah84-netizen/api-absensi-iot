@@ -14,12 +14,14 @@ X-Device-Token: tok_rahasia_mesin_anda
 ```
 
 ### Fleksibilitas Header pada Backend
+
 Untuk kemudahan pengembang, backend disarankan mendukung beberapa variasi header autentikasi:
+
 1. `X-Device-Token: <token>` (Standar bawaan mesin ESP32)
 2. `X-IoT-Token: <token>` (Alternatif)
 3. `Authorization: Bearer <token>` (Standar REST API)
 
-> ⚠️ **Catatan Penting (CSRF Bypass):**
+> ⚠️ **Catatan Penting (CSRF Bypass):**  
 > Mesin ESP32 adalah *standalone hardware* dan **tidak memiliki sesi web browser/CSRF token**. Seluruh rute `/api/v1/iot/*` **wajib dikecualikan dari proteksi CSRF**.
 
 ---
@@ -28,11 +30,12 @@ Untuk kemudahan pengembang, backend disarankan mendukung beberapa variasi header
 
 Endpoint utama yang dipanggil oleh mesin ESP32 seketika saat kartu RFID didekatkan ke sensor atau kode barcode/QR terdeteksi oleh modul scanner kamera.
 
-* **URL:** `POST /api/v1/iot/scan` (atau URL kustom seperti `https://domain-anda.com/api/scan.php`)
-* **Method:** `POST`
-* **Content-Type:** `application/json`
+- **URL:** `POST /api/v1/iot/scan` (atau URL kustom seperti `https://domain-anda.com/api/scan.php`)
+- **Method:** `POST`
+- **Content-Type:** `application/json`
 
-### 📥 Request Payload (JSON):
+### Request Payload Scan (JSON)
+
 ```json
 {
   "code": "A1B2C3D4",
@@ -42,9 +45,10 @@ Endpoint utama yang dipanggil oleh mesin ESP32 seketika saat kartu RFID didekatk
 }
 ```
 
-#### Spesifikasi Parameter Request:
+#### Spesifikasi Parameter Request
+
 | Parameter | Tipe Data | Status | Keterangan & Contoh |
-|---|---|:---:|---|
+| --- | --- | :---: | --- |
 | `code` | `string` | **Wajib** | Nilai UID Kartu RFID (Hex uppercase, misal: `"A1B2C3D4"`) atau string teks isi Barcode/QR Code (misal: `"NISN-2026001"`). |
 | `device_id` | `string` | Opsional | Kode identifikasi fisik perangkat mesin (misal: `"DEV-GERBANG-01"`). |
 | `scanned_at` | `string` | Opsional | Timestamp ISO-8601 dari jam internal (RTC DS1302) mesin. Berguna saat sinkronisasi data *offline buffer*. |
@@ -52,11 +56,12 @@ Endpoint utama yang dipanggil oleh mesin ESP32 seketika saat kartu RFID didekatk
 
 ---
 
-### 📤 Format Response Server:
+### Format Response Server
 
 Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 I2C** pada mesin fisik.
 
 #### 🟢 Skenario 1: Absen Masuk Sukses - Tepat Waktu (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -67,13 +72,15 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Absensi Masuk Berhasil"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi` (Maks 16 karakter)
-* **Layar LCD Baris 2**: `HADIR - 07:15`
-* **Audio Buzzer**: 2x Beep Pendek (2400 Hz)
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi` (Maks 16 karakter)
+- **Layar LCD Baris 2**: `HADIR - 07:15`
+- **Audio Buzzer**: 2x Beep Pendek (2400 Hz)
 
 ---
 
 #### 🟡 Skenario 2: Absen Masuk Sukses - Terlambat (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -84,13 +91,15 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Absen Masuk (Terlambat)"
 }
 ```
-* **Layar LCD Baris 1**: `Budi Santoso`
-* **Layar LCD Baris 2**: `TELAT - 07:45`
-* **Audio Buzzer**: 2x Beep Pendek
+
+- **Layar LCD Baris 1**: `Budi Santoso`
+- **Layar LCD Baris 2**: `TELAT - 07:45`
+- **Audio Buzzer**: 2x Beep Pendek
 
 ---
 
 #### 🔵 Skenario 3: Absen Pulang Sukses (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -101,14 +110,17 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Absensi Pulang Berhasil"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi`
-* **Layar LCD Baris 2**: `PULANG - 14:15`
-* **Audio Buzzer**: 2x Beep Pendek
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi`
+- **Layar LCD Baris 2**: `PULANG - 14:15`
+- **Audio Buzzer**: 2x Beep Pendek
 
 ---
 
 #### ⚪ Skenario 4: Double-Tap Barusan / Anti-Spam (HTTP 200)
+
 *Terjadi saat pengguna tidak sengaja menempelkan kartu 2 kali berturut-turut dalam jeda < 30 detik.*
+
 ```json
 {
   "success": true,
@@ -119,13 +131,15 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Sudah Absen Barusan"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi`
-* **Layar LCD Baris 2**: `SUDAH ABSEN HARI`
-* **Audio Buzzer**: 1x Beep Panjang (500 ms)
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi`
+- **Layar LCD Baris 2**: `SUDAH ABSEN HARI`
+- **Audio Buzzer**: 1x Beep Panjang (500 ms)
 
 ---
 
 #### 🔴 Skenario 5: Kartu Belum Terdaftar (HTTP 404)
+
 ```json
 {
   "success": false,
@@ -134,13 +148,15 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Kartu Tidak Terdaftar"
 }
 ```
-* **Layar LCD Baris 1**: `KARTU DITOLAK`
-* **Layar LCD Baris 2**: `Tidak Terdaftar`
-* **Audio Buzzer**: 3x Beep Cepat (1000 Hz)
+
+- **Layar LCD Baris 1**: `KARTU DITOLAK`
+- **Layar LCD Baris 2**: `Tidak Terdaftar`
+- **Audio Buzzer**: 3x Beep Cepat (1000 Hz)
 
 ---
 
 #### ⛔ Skenario 6: Token Otorisasi Ditolak (HTTP 401)
+
 ```json
 {
   "success": false,
@@ -148,9 +164,10 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
   "message": "Unauthorized: Token Perangkat Tidak Valid"
 }
 ```
-* **Layar LCD Baris 1**: `AUTH ERROR`
-* **Layar LCD Baris 2**: `TOKEN DITOLAK`
-* **Audio Buzzer**: 3x Beep Cepat
+
+- **Layar LCD Baris 1**: `AUTH ERROR`
+- **Layar LCD Baris 2**: `TOKEN DITOLAK`
+- **Audio Buzzer**: 3x Beep Cepat
 
 ---
 
@@ -158,10 +175,11 @@ Backend wajib mengembalikan format JSON yang ramah terhadap tampilan **LCD 16x2 
 
 Dipanggil secara berkala oleh mesin ESP32 (setiap 60 detik) untuk mengirimkan status kesehatan hardware, kekuatan sinyal WiFi, dan sinkronisasi jam server.
 
-* **URL:** `POST /api/v1/iot/heartbeat`
-* **Method:** `POST`
+- **URL:** `POST /api/v1/iot/heartbeat`
+- **Method:** `POST`
 
-### 📥 Request Payload:
+### Request Payload Heartbeat
+
 ```json
 {
   "device_id": "DEV-GERBANG-01",
@@ -172,13 +190,14 @@ Dipanggil secara berkala oleh mesin ESP32 (setiap 60 detik) untuk mengirimkan st
 ```
 
 | Parameter | Tipe Data | Keterangan |
-|---|---|---|
+| --- | --- | --- |
 | `device_id` | `string` | Nomor seri perangkat. |
 | `wifi_rssi` | `integer` | Kekuatan sinyal WiFi dalam dBm (contoh: `-50` sangat bagus, `-85` lemah). |
 | `fw_version` | `string` | Versi firmware aktif pada ESP32. |
-| `scans_today`| `integer` | Total jumlah scan kartu yang berhasil dilakukan unit hari ini. |
+| `scans_today` | `integer` | Total jumlah scan kartu yang berhasil dilakukan unit hari ini. |
 
-### 📤 Response Payload (HTTP 200):
+### Response Payload Heartbeat (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -194,17 +213,19 @@ Dipanggil secara berkala oleh mesin ESP32 (setiap 60 detik) untuk mengirimkan st
 
 Dipanggil saat mesin ESP32 pertama kali terhubung ke WiFi saat booting. Endpoint ini mengirimkan profil nama lembaga/sekolah serta jadwal jam masuk dan jam pulang.
 
-* **URL:** `POST /api/v1/iot/config`
-* **Method:** `POST`
+- **URL:** `POST /api/v1/iot/config`
+- **Method:** `POST`
 
-### 📥 Request Payload:
+### Request Payload Config
+
 ```json
 {
   "device_id": "DEV-GERBANG-01"
 }
 ```
 
-### 📤 Response Payload (HTTP 200):
+### Response Payload Config (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -228,7 +249,7 @@ Dipanggil saat mesin ESP32 pertama kali terhubung ke WiFi saat booting. Endpoint
 ```
 
 | Field Response | Keterangan |
-|---|---|
+| --- | --- |
 | `nama_lembaga` | Nama sekolah / instansi yang ditampilkan pada **Baris 1 LCD Mesin** saat standby. |
 | `tipe_sensor` | Varian sensor yang terpasang (`"RFID_MIFARE"`, `"2D_BARCODE"`, `"RFID_2D_BARCODE_COMBO"`). |
 | `standby_text` | Pesan standby pada **Baris 2 LCD** (contoh: `"TEMPEL KARTU"`, `"ARAHKAN KODE QR"`). |
@@ -240,10 +261,11 @@ Dipanggil saat mesin ESP32 pertama kali terhubung ke WiFi saat booting. Endpoint
 
 Endpoint yang diakses secara periodik oleh halaman browser Live Monitor / Layar Smart TV Lobi.
 
-* **URL:** `GET /api/v1/iot/monitor/data` (atau `GET /api/monitor_data.php`)
-* **Method:** `GET`
+- **URL:** `GET /api/v1/iot/monitor/data` (atau `GET /api/monitor_data.php`)
+- **Method:** `GET`
 
-### 📤 Response Payload (HTTP 200):
+### Response Payload Live Monitor (HTTP 200)
+
 ```json
 {
   "records": [
@@ -275,7 +297,93 @@ Endpoint yang diakses secara periodik oleh halaman browser Live Monitor / Layar 
 
 ---
 
-## 🚀 6. Layanan Firmware OTA Terpusat (Centralized OTA)
+## 🖥️ 6. Endpoint Telemetri & Monitoring Perangkat (`GET /api/v1/iot/devices/data`)
+
+Endpoint ini diakses secara asinkron (AJAX polling) oleh halaman dashboard kontrol admin (`/absensi/devices` di Laravel atau `devices.php` di PHP Native) untuk memantau status seluruh unit mesin absensi yang terpasang di lapangan.
+
+- **URL:** `GET /api/v1/iot/devices/data` (atau `GET /api/device_data.php`)
+- **Method:** `GET`
+
+### Response Payload Monitoring Perangkat (HTTP 200)
+
+```json
+{
+  "devices": [
+    {
+      "id": 1,
+      "device_id": "DEV-GERBANG-01",
+      "device_name": "Mesin Gerbang Utama",
+      "location": "Pintu Gerbang Depan",
+      "ip_address": "192.168.1.105",
+      "fw_version": "v2.0.0",
+      "wifi_rssi": -62,
+      "scans_today": 142,
+      "last_ping_human": "15 detik lalu",
+      "is_online": true
+    }
+  ],
+  "unregistered_cards": [
+    {
+      "id": 1,
+      "code": "4A3B2C1D",
+      "jenis": "RFID",
+      "device_id": "DEV-GERBANG-01",
+      "scanned_at": "2026-10-12 07:15:30",
+      "scan_count": 2
+    }
+  ],
+  "settings": {
+    "institution_name": "SMK NEGERI 1 BOGOR",
+    "standby_text": "SILAKAN ABSEN"
+  },
+  "summary": {
+    "total_devices": 3,
+    "online_count": 2,
+    "offline_count": 1,
+    "unregistered_count": 1
+  }
+}
+```
+
+---
+
+## 🗄️ 7. Skema Database Inti IoT & Data Siswa/Karyawan
+
+Berikut adalah ringkasan kolom tabel database yang berhubungan langsung dengan operasional mesin IoT:
+
+### A. Tabel `attendance_devices` (Daftar Mesin IoT)
+
+Menyimpan identitas unit fisik, status koneksi, dan telemetri hardware:
+
+- `device_id` (`VARCHAR(64)`): Nomor seri unik unit mesin (contoh: `DEV-GERBANG-01`).
+- `device_name` (`VARCHAR(100)`): Nama alias penempatan (contoh: `Mesin Gerbang Utama`).
+- `secret_token` (`VARCHAR(128)`): Token autentikasi untuk validasi header `X-Device-Token`.
+- `wifi_rssi` (`INT`): Kekuatan sinyal WiFi dalam satuan dBm (misal: `-62`).
+- `scans_today` (`INT`): Akumulasi jumlah tap kartu yang sukses hari ini.
+- `standby_text_override` (`VARCHAR(16)`): Pesan standby khusus untuk unit ini (opsional).
+- `last_ping` (`TIMESTAMP`): Waktu terakhir mesin mengirim heartbeat.
+
+### B. Tabel `iot_settings` (Pengaturan Lembaga Global)
+
+Menyimpan teks yang ditampilkan pada layar LCD 16x2 mesin saat standby:
+
+- `key_name` = `'institution_name'`: Nama sekolah/instansi (maksimal 16 karakter, tampil di Baris 1 LCD).
+- `key_name` = `'standby_text'`: Teks ajakan standby (maksimal 16 karakter, tampil di Baris 2 LCD).
+
+### C. Tabel `unregistered_cards` (Buffer Pendaftaran Kartu)
+
+Menampung kartu RFID atau barcode baru yang belum terdaftar di database saat ditempelkan ke mesin, memudahkan admin mendaftarkan kartu ke siswa/karyawan tanpa mengetik manual UID:
+
+- `code` (`VARCHAR(64)`): UID Kartu RFID (Hex) atau kode QR.
+- `jenis` (`VARCHAR(20)`): `RFID` atau `BARCODE`.
+- `device_id` (`VARCHAR(64)`): Mesin tempat kartu pertama kali ditempelkan.
+- `scan_count` (`INT`): Jumlah percobaan scan.
+
+> 📖 **Panduan Menghubungkan Data Siswa / Karyawan Eksisting:** Baca panduan lengkap di [`docs/STUDENT_AND_EMPLOYEE_INTEGRATION.md`](STUDENT_AND_EMPLOYEE_INTEGRATION.md).
+
+---
+
+## 🚀 8. Layanan Firmware OTA Terpusat (Centralized OTA)
 
 Mesin Smart Box ESP32 dilengkapi dengan mekanisme pembaruan jarak jauh (*Over-The-Air Update*).
 

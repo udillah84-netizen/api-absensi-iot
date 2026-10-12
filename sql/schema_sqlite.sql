@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS attendance_devices (
     token TEXT NOT NULL UNIQUE,
     tipe_sensor TEXT DEFAULT 'COMBO', -- COMBO, RFID, BARCODE
     status TEXT DEFAULT 'offline', -- online, offline
+    wifi_rssi INTEGER,
+    scans_today INTEGER DEFAULT 0,
+    standby_text_override TEXT,
     last_heartbeat DATETIME,
     ip_address TEXT,
     firmware_version TEXT DEFAULT 'v2.0.0',
@@ -87,3 +90,28 @@ CREATE TABLE IF NOT EXISTS attendance_settings (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 6. Tabel Konfigurasi Lembaga & Mesin IoT (IoT Settings)
+CREATE TABLE IF NOT EXISTS iot_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nama_lembaga TEXT NOT NULL DEFAULT 'SMK NEGERI 1 CONTOH',
+    standby_text TEXT NOT NULL DEFAULT 'SILAKAN ABSEN',
+    timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
+    duplicate_window_seconds INTEGER NOT NULL DEFAULT 30,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. Tabel Antrean Kartu Belum Terdaftar (Unregistered Card Enrollment)
+CREATE TABLE IF NOT EXISTS unregistered_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    jenis TEXT DEFAULT 'RFID',
+    device_id TEXT,
+    last_scanned_at DATETIME NOT NULL,
+    tap_count INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_unregistered_cards_scanned ON unregistered_cards (last_scanned_at);

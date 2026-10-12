@@ -72,6 +72,8 @@ function logScan(PDO $pdo, $deviceId, $code, $tipeUser, $userId, $jenis, $status
 // Skenario 1: Kartu Tidak Dikenal
 if (!$user) {
     logScan($pdo, $deviceId, $code, null, null, $jenis, 'failed', 'Kartu tidak terdaftar', $scannedAt);
+    recordUnregisteredCard($pdo, $code, $jenis, $deviceId);
+
     http_response_code(404);
     echo json_encode([
         'success' => false,

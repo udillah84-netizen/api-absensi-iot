@@ -103,3 +103,46 @@ function formatLcdName(string $name): string
 
     return mb_substr($name, 0, 16);
 }
+
+/**
+ * Mendapatkan konfigurasi IoT aktif dari tabel iot_settings (atau fallback ke default)
+ */
+function getIotSettings(PDO $pdo): array
+{
+    $default = [
+        'nama_lembaga'             => defined('NAMA_LEMBAGA') ? NAMA_LEMBAGA : 'SMK NEGERI 1 BOGOR',
+        'standby_text'             => defined('STANDBY_TEXT') ? STANDBY_TEXT : 'SILAKAN ABSEN',
+        'timezone'                 => 'Asia/Jakarta',
+        'duplicate_window_seconds' => defined('ANTI_DUPLICATE_WINDOW') ? ANTI_DUPLICATE_WINDOW : 30,
+    ];
+
+    try {
+        $stmt = $pdo->query('SELECT * FROM iot_settings ORDER BY id ASC LIMIT 1');
+        $row = $stmt->fetch();
+        if ($row) {
+            return array_merge($default, $row);
+        }
+    } catch (Exception $e) {}
+
+    return $default;
+}
+
+/**
+ * Merekam kartu belum terdaftar ke antrean unregistered_cards
+ */
+function recordUnregisteredCard(PDO $pdo, string $code, string $jenis = 'RFID', ?string $deviceId = null): void
+{
+    try {
+        $stmt = $pdo->prepare('
+            INSERT INTO unregistered_cards (code, jenis, device_id, last_scanned_at, tap_count, created_at, updated_at)
+            VALUES (?, ?, ?, NOW(), 1, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE 
+                jenis = VALUES(jenis),
+                device_id = VALUES(device_id),
+                last_scanned_at = NOW(),
+                tap_count = tap_count + 1,
+                updated_at = NOW()
+        ');
+        $stmt->execute([$code, $jenis, $deviceId]);
+    } catch (Exception $e) {}
+}

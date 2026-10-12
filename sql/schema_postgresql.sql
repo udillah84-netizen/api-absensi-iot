@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS attendance_devices (
     token VARCHAR(64) NOT NULL UNIQUE,
     tipe_sensor VARCHAR(20) DEFAULT 'COMBO', -- 'COMBO', 'RFID', 'BARCODE'
     status device_status_enum DEFAULT 'offline',
+    wifi_rssi INT,
+    scans_today INT DEFAULT 0,
+    standby_text_override VARCHAR(50),
     last_heartbeat TIMESTAMP WITH TIME ZONE,
     ip_address VARCHAR(45),
     firmware_version VARCHAR(20) DEFAULT 'v2.0.0',
@@ -93,3 +96,28 @@ CREATE TABLE IF NOT EXISTS attendance_settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 6. Tabel Konfigurasi Lembaga & Mesin IoT (IoT Settings)
+CREATE TABLE IF NOT EXISTS iot_settings (
+    id BIGSERIAL PRIMARY KEY,
+    nama_lembaga VARCHAR(100) NOT NULL DEFAULT 'SMK NEGERI 1 CONTOH',
+    standby_text VARCHAR(50) NOT NULL DEFAULT 'SILAKAN ABSEN',
+    timezone VARCHAR(50) NOT NULL DEFAULT 'Asia/Jakarta',
+    duplicate_window_seconds INT NOT NULL DEFAULT 30,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. Tabel Antrean Kartu Belum Terdaftar (Unregistered Card Enrollment)
+CREATE TABLE IF NOT EXISTS unregistered_cards (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(128) NOT NULL UNIQUE,
+    jenis scan_method_enum DEFAULT 'RFID',
+    device_id VARCHAR(50),
+    last_scanned_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    tap_count INT DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_unregistered_cards_scanned ON unregistered_cards (last_scanned_at);

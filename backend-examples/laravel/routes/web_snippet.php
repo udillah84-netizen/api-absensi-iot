@@ -15,3 +15,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/absensi/monitor', [IotAttendanceController::class, 'liveMonitor'])
     ->name('iot.attendance.monitor.view');
+
+Route::get('/absensi/devices', [IotAttendanceController::class, 'deviceMonitoring'])
+    ->name('iot.attendance.devices.view');

@@ -16,14 +16,17 @@ Selamat datang di repositori resmi **IoT Attendance Integration Kit**. Repositor
 ## 🎯 Mengapa Starter Kit Ini Dibuat?
 
 Ketika Anda membeli mesin absensi fisik komersial di pasaran, kendala terbesar pengembang biasanya adalah:
+
 - ❌ SDK sulit dipahami, dokumentasi bahasa asing minim contoh, atau mengharuskan instalasi aplikasi desktop *middleware* Windows yang berat.
 - ❌ Format data terkunci (*proprietary protocol*) dan sulit dikirim langsung ke REST API website berbasis cloud / cPanel.
 
 **Dengan Smart Box ESP32 ini, semuanya berubah:**
+
 - ✅ **100% Berbasis REST API JSON Standar**: Menggunakan method `HTTP POST` dan payload `application/json` yang kompatibel dengan seluruh bahasa pemrograman di dunia.
 - ✅ **Plug & Play Multi-Framework**: Tersedia modul siap pakai untuk Laravel, PHP Native, Node.js, Python FastAPI, dan Golang.
 - ✅ **Web Hardware Simulator Bawaan**: Anda dapat mengembangkan dan menguji backend Anda **sebelum unit fisik mesin tiba di lokasi**.
 - ✅ **Layar TV Lobi Real-time (Live Monitor)**: Template monitor presensi langsung yang dapat dibuka di Smart TV gerbang sekolah/lobi kantor.
+- ✅ **Dashboard Monitoring Mesin IoT & Pendaftaran Kartu**: Pantau kekuatan sinyal WiFi RSSI (-55 dBm), total scan hari ini, status online/offline mesin, serta daftarkan kartu RFID baru dalam 1 kali klik.
 
 ---
 
@@ -73,28 +76,30 @@ api-absensi-iot/
 ├── SKILL.md                                  # Skill cheatsheet otomasi integrasi
 │
 ├── sql/                                      # Skema Database Siap Impor
-│   ├── schema_mysql.sql                      # Skema MySQL / MariaDB (InnoDB)
+│   ├── schema_mysql.sql                      # Skema MySQL / MariaDB (devices + settings + unregistered_cards)
 │   ├── schema_postgresql.sql                 # Skema PostgreSQL
 │   ├── schema_sqlite.sql                     # Skema SQLite
 │   └── sample_data.sql                       # Data sampel pengguna, kartu RFID & QR tester
 │
 ├── backend-examples/                         # Template Backend Siap Salin & Pakai
 │   ├── laravel/                              # Template Laravel 10 / 11 / 12 / 13
-│   │   ├── app/Http/Controllers/             # IotAttendanceController.php (Scan, Heartbeat, Live Monitor)
+│   │   ├── app/Http/Controllers/             # IotAttendanceController.php (Scan, Heartbeat, Config, Monitor)
 │   │   ├── app/Http/Middleware/              # EnsureIotTokenIsValid.php
-│   │   ├── app/Models/                       # Model Attendance, Device, Log, Setting
-│   │   ├── database/migrations/              # Migrasi database lengkap
-│   │   ├── resources/views/iot/              # live_monitor.blade.php (TV Kiosk Dashboard)
+│   │   ├── app/Models/                       # Model Attendance, Device, Setting, UnregisteredCard
+│   │   ├── database/migrations/              # Migrasi database lengkap (termasuk setting & buffer kartu)
+│   │   ├── resources/views/iot/              # live_monitor.blade.php & device_monitoring.blade.php
 │   │   └── routes/                           # api_snippet.php & web_snippet.php
 │   │
 │   ├── php-native/                           # Solusi PHP Native / cPanel / Shared Hosting
 │   │   ├── api/scan.php                      # Endpoint scan presensi mandiri PDO
-│   │   ├── api/heartbeat.php                 # Endpoint heartbeat status mesin
-│   │   ├── api/config.php                    # Endpoint konfigurasi jam kerja
-│   │   ├── api/monitor_data.php              # Endpoint data real-time live feed
+│   │   ├── api/heartbeat.php                 # Endpoint heartbeat status & RSSI mesin
+│   │   ├── api/config.php                    # Endpoint konfigurasi nama sekolah & standby text
+│   │   ├── api/monitor_data.php              # Endpoint data real-time live feed TV
+│   │   ├── api/device_data.php               # Endpoint telemetri monitoring status mesin
 │   │   ├── monitor.php                       # Halaman Live Monitor TV drop-in
-│   │   ├── config.php                        # Kredensial DB & Token Rahasia
-│   │   └── db.php                            # Koneksi PDO singleton aman
+│   │   ├── devices.php                       # Dashboard Monitoring Mesin & Registrasi Kartu
+│   │   ├── config.php                        # Kredensial DB, Token Rahasia & Pengaturan Default
+│   │   └── db.php                            # Koneksi PDO singleton aman + helper query
 │   │
 │   ├── nodejs-express/                       # Starter Node.js (Express + CORS + Joi)
 │   ├── python-fastapi/                       # Starter Python (FastAPI + Pydantic + Uvicorn)
@@ -103,7 +108,7 @@ api-absensi-iot/
 ├── simulator/                                # Web Hardware Simulator Interaktif
 │   ├── index.html                            # Visual Chassis Smart Box + LCD 16x2 + Switcher Varian
 │   ├── style.css                             # Matrix font & LCD backlight styling
-│   └── app.js                                # Synthesizer audio buzzer Web Audio API & request engine
+│   └── app.js                                # Synthesizer audio buzzer Web Audio API, Ping & Boot engine
 │
 ├── postman/                                  # Koleksi Postman Siap Impor
 │   ├── IoT_Attendance_API.postman_collection.json
@@ -111,6 +116,7 @@ api-absensi-iot/
 │
 └── docs/                                     # Dokumentasi Spesifikasi Mendalam
     ├── API_REFERENCE.md                      # Kontrak lengkap seluruh endpoint REST API
+    ├── STUDENT_AND_EMPLOYEE_INTEGRATION.md   # Panduan integrasi database Siswa, Karyawan & Card Enrollment
     ├── LIVE_MONITORING.md                    # Panduan Live Stream TV Kiosk di Lobi / Gerbang
     ├── HARDWARE_AND_TROUBLESHOOTING.md       # Arti kode display LCD, LED, & nada buzzer
     └── CLIENT_ORDER_CHECKLIST.md             # Formulir konfigurasi data saat pemesanan mesin
@@ -121,15 +127,18 @@ api-absensi-iot/
 ## ⚡ Langkah Cepat Integrasi (5 Menit)
 
 ### Langkah 1: Siapkan Database
+
 Pilih file skema database yang sesuai di folder [`sql/`](sql/):
+
 - **MySQL / MariaDB:** Impor file [`sql/schema_mysql.sql`](sql/schema_mysql.sql)
 - **Data Pengujian:** Impor file [`sql/sample_data.sql`](sql/sample_data.sql) untuk mengisi data dummy siswa/pegawai tester.
 
 ### Langkah 2: Pilih & Pasang Modul Backend Anda
+
 Buka folder starter kit sesuai framework yang Anda gunakan:
 
 | Framework | Panduan | Waktu Integrasi |
-|---|---|:---:|
+| --- | --- | :---: |
 | **Laravel (10-13)** | Baca [`backend-examples/laravel/README.md`](backend-examples/laravel/README.md) | ~3 Menit |
 | **PHP Native / cPanel** | Baca [`backend-examples/php-native/README.md`](backend-examples/php-native/README.md) | ~2 Menit |
 | **Node.js (Express)** | Baca [`backend-examples/nodejs-express/README.md`](backend-examples/nodejs-express/README.md) | ~3 Menit |
@@ -137,6 +146,7 @@ Buka folder starter kit sesuai framework yang Anda gunakan:
 | **Golang (Gin)** | Baca [`backend-examples/golang-gin/README.md`](backend-examples/golang-gin/README.md) | ~3 Menit |
 
 ### Langkah 3: Uji Coba dengan Web Hardware Simulator
+
 1. Buka berkas [`simulator/index.html`](simulator/index.html) langsung di browser Anda.
 2. Masukkan **API Endpoint URL** server Anda (contoh: `http://localhost:8000/api/v1/iot/scan`) dan **Device Secret Token** (contoh: `tok_rahasia_mesin_anda`).
 3. Pilih varian perangkat (**Combo Dual**, **Hanya RFID**, atau **Hanya Barcode/QR**).
@@ -148,7 +158,9 @@ Buka folder starter kit sesuai framework yang Anda gunakan:
 ## 🔌 Rangkuman Kontrak REST API
 
 ### 1. Header Autentikasi Wajib
+
 Setiap request dari unit mesin menyertakan header keamanan berikut:
+
 ```http
 Content-Type: application/json
 X-Device-Token: tok_rahasia_mesin_anda
@@ -158,7 +170,8 @@ X-Device-Token: tok_rahasia_mesin_anda
 
 ### 2. Endpoint Scan Presensi (`POST /api/v1/iot/scan`)
 
-#### Payload Request dari Mesin (HTTP POST):
+#### Payload Request dari Mesin (HTTP POST)
+
 ```json
 {
   "code": "A1B2C3D4",
@@ -169,15 +182,16 @@ X-Device-Token: tok_rahasia_mesin_anda
 ```
 
 | Parameter | Tipe Data | Keterangan |
-|---|---|---|
+| --- | --- | --- |
 | `code` | `string` | UID Kartu RFID (Hex) atau data string isi Barcode/QR Code. |
 | `device_id` | `string` | Nomor seri / identifier fisik unit mesin. |
 | `scanned_at` | `string` | Waktu scan dari RTC mesin (ISO-8601). Digunakan untuk validasi sinkronisasi offline. |
 | `jenis` | `string` | `"RFID"` atau `"BARCODE"`. |
 
-#### Format Response Server (Ramah LCD 16x2):
+#### Format Response Server (Ramah LCD 16x2)
 
 ##### 🟢 Skenario 1: Hadir Tepat Waktu (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -188,11 +202,13 @@ X-Device-Token: tok_rahasia_mesin_anda
   "message": "Absensi Masuk Berhasil"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi` (Maks 16 karakter)
-* **Layar LCD Baris 2**: `HADIR - 07:15`
-* **Audio Buzzer**: 2x Beep Pendek (Sukses)
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi` (Maks 16 karakter)
+- **Layar LCD Baris 2**: `HADIR - 07:15`
+- **Audio Buzzer**: 2x Beep Pendek (Sukses)
 
 ##### 🟡 Skenario 2: Hadir Terlambat (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -203,10 +219,12 @@ X-Device-Token: tok_rahasia_mesin_anda
   "message": "Absen Masuk (Terlambat)"
 }
 ```
-* **Layar LCD Baris 1**: `Budi Santoso`
-* **Layar LCD Baris 2**: `TELAT - 07:45`
+
+- **Layar LCD Baris 1**: `Budi Santoso`
+- **Layar LCD Baris 2**: `TELAT - 07:45`
 
 ##### 🔵 Skenario 3: Absen Pulang (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -217,10 +235,12 @@ X-Device-Token: tok_rahasia_mesin_anda
   "message": "Absensi Pulang Berhasil"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi`
-* **Layar LCD Baris 2**: `PULANG - 14:15`
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi`
+- **Layar LCD Baris 2**: `PULANG - 14:15`
 
 ##### ⚪ Skenario 4: Double Tap Barusan (HTTP 200)
+
 ```json
 {
   "success": true,
@@ -231,10 +251,12 @@ X-Device-Token: tok_rahasia_mesin_anda
   "message": "Sudah Absen Barusan"
 }
 ```
-* **Layar LCD Baris 1**: `Ahmad Fauzi`
-* **Layar LCD Baris 2**: `SUDAH ABSEN HARI`
+
+- **Layar LCD Baris 1**: `Ahmad Fauzi`
+- **Layar LCD Baris 2**: `SUDAH ABSEN HARI`
 
 ##### 🔴 Skenario 5: Kartu Belum Terdaftar (HTTP 404)
+
 ```json
 {
   "success": false,
@@ -243,21 +265,45 @@ X-Device-Token: tok_rahasia_mesin_anda
   "message": "Kartu Tidak Terdaftar"
 }
 ```
-* **Layar LCD Baris 1**: `KARTU DITOLAK`
-* **Layar LCD Baris 2**: `Tidak Terdaftar`
-* **Audio Buzzer**: 3x Beep Cepat (Error)
+
+- **Layar LCD Baris 1**: `KARTU DITOLAK`
+- **Layar LCD Baris 2**: `Tidak Terdaftar`
+- **Audio Buzzer**: 3x Beep Cepat (Error)
+- *Catatan:* Kartu ini otomatis disimpan ke antrean `unregistered_cards` agar admin dapat mendaftarkannya langsung dari web UI!
 
 ---
 
 ### 3. Endpoint Pendukung Lainnya
 
 | Endpoint | Method | Fungsi |
-|---|:---:|---|
+| --- | :---: | --- |
 | `/api/v1/iot/heartbeat` | `POST` | Mengirim telemetri sinyal WiFi RSSI, versi firmware, total scan, dan sinkronisasi waktu server. |
 | `/api/v1/iot/config` | `POST` | Menyuplai nama sekolah lembaga, varian sensor, dan jam operasional saat mesin booting. |
 | `/api/v1/iot/monitor/data` | `GET` | Menyuplai data scan absensi hari ini ke dashboard Live Monitor / Layar TV Lobi. |
+| `/api/v1/iot/devices/data` | `GET` | Menyuplai data telemetri kesehatan seluruh unit mesin ke dashboard kontrol admin. |
 
 > 📖 **Pelajari seluruh detail payload & parameter di [Dokumentasi API Reference Lengkap (`docs/API_REFERENCE.md`)](docs/API_REFERENCE.md).**
+
+---
+
+## 🖥️ Dashboard Monitoring Mesin IoT & Pendaftaran Kartu
+
+Starter kit ini dilengkapi dengan **Pusat Kontrol & Monitoring Perangkat IoT**:
+
+1. **Pemantauan Kesehatan Perangkat (Health Monitor)**:
+   - Status **🟢 ONLINE** / **🔴 OFFLINE** (otomatis offline jika tidak ada ping > 3 menit).
+   - Kekuatan sinyal WiFi dalam dBm dan bilah indikator visual (contoh: `-55 dBm Sangat Bagus`).
+   - Akumulasi total scan yang sukses hari ini di setiap unit.
+   - Versi firmware aktif dan alamat IP lokal mesin.
+2. **Pendaftaran Kartu Cepat (Auto Enrollment)**:
+   - Kartu baru yang di-tap pada mesin otomatis tercatat di antrean.
+   - Admin cukup memilih nama Siswa / Karyawan dari dropdown dan klik Simpan. Bebas dari salah ketik kode hex!
+3. **Pengaturan Nama Sekolah & Teks Standby LCD**:
+   - Ganti tulisan baris 1 LCD (nama lembaga) dan baris 2 (pesan standby) langsung dari browser tanpa bongkar/reflash firmware!
+
+- **Akses Laravel**: `http://localhost:8000/absensi/devices`
+- **Akses PHP Native**: `http://localhost/devices.php`
+- 📖 **Panduan Menghubungkan Data Siswa / Karyawan**: Baca [`docs/STUDENT_AND_EMPLOYEE_INTEGRATION.md`](docs/STUDENT_AND_EMPLOYEE_INTEGRATION.md).
 
 ---
 
@@ -295,6 +341,7 @@ Starter kit ini dilengkapi dengan halaman **Live Monitor Real-time** yang diranc
 ## 📚 Panduan Lengkap & Navigasi Cepat
 
 - 📖 [**Dokumentasi Kontrak REST API Lengkap (`docs/API_REFERENCE.md`)**](docs/API_REFERENCE.md)
+- 🎓 [**Panduan Integrasi Siswa, Karyawan & Enrollment (`docs/STUDENT_AND_EMPLOYEE_INTEGRATION.md`)**](docs/STUDENT_AND_EMPLOYEE_INTEGRATION.md)
 - 📺 [**Panduan Live Monitor & TV Kiosk Lobi (`docs/LIVE_MONITORING.md`)**](docs/LIVE_MONITORING.md)
 - 🔧 [**Arti Tampilan LCD, LED Indikator & Nada Buzzer (`docs/HARDWARE_AND_TROUBLESHOOTING.md`)**](docs/HARDWARE_AND_TROUBLESHOOTING.md)
 - 📝 [**Formulir Pra-Pemesanan Unit Mesin (`docs/CLIENT_ORDER_CHECKLIST.md`)**](docs/CLIENT_ORDER_CHECKLIST.md)
@@ -303,4 +350,5 @@ Starter kit ini dilengkapi dengan halaman **Live Monitor Real-time** yang diranc
 ---
 
 ## 💬 Bantuan & Layanan Integrasi
+
 Jika Anda membutuhkan bantuan kustomisasi logika presensi, integrasi dengan database khusus (Oracle, SQL Server), atau pengadaan unit mesin Smart Box ESP32 tambahan, silakan hubungi tim pengembang kami.

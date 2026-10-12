@@ -24,16 +24,16 @@ try {
             a.id,
             a.user_id,
             a.status,
-            a.check_in_time,
-            a.check_out_time,
-            a.device_id,
+            a.jam_masuk,
+            a.jam_pulang,
+            a.device_id_masuk,
             a.updated_at,
             u.name,
-            u.class_or_department,
-            u.avatar_url
+            u.department,
+            NULL as avatar_url
         FROM attendances a
         LEFT JOIN users u ON a.user_id = u.id
-        WHERE a.date = :today
+        WHERE a.tanggal = :today
         ORDER BY a.updated_at DESC
         LIMIT 24
     ");
@@ -43,8 +43,8 @@ try {
     $records = [];
     foreach ($rows as $row) {
         $name = $row['name'] ?? 'Pengguna';
-        $inTime = $row['check_in_time'] ? date('H:i', strtotime($row['check_in_time'])) : '--:--';
-        $outTime = $row['check_out_time'] ? date('H:i', strtotime($row['check_out_time'])) : '--:--';
+        $inTime = !empty($row['jam_masuk']) ? substr($row['jam_masuk'], 0, 5) : '--:--';
+        $outTime = !empty($row['jam_pulang']) ? substr($row['jam_pulang'], 0, 5) : '--:--';
 
         // Format waktu relatif sederhana
         $updatedTs = strtotime($row['updated_at'] ?? 'now');
@@ -62,12 +62,12 @@ try {
             'user_id'        => (int)$row['user_id'],
             'nama'           => $name,
             'inisial'        => mb_strtoupper(mb_substr($name, 0, 1)),
-            'kelas'          => $row['class_or_department'] ?? 'Siswa/Staff',
+            'kelas'          => $row['department'] ?? 'Siswa/Staff',
             'foto'           => $row['avatar_url'] ?? null,
             'jam_masuk'      => $inTime,
             'jam_pulang'     => $outTime,
             'status'         => $row['status'] ?? 'Hadir',
-            'device_id'      => $row['device_id'] ?? 'GERBANG-01',
+            'device_id'      => $row['device_id_masuk'] ?? 'GERBANG-01',
             'time_formatted' => $timeFormatted,
             'updated_at'     => $row['updated_at'],
         ];
@@ -79,9 +79,9 @@ try {
             COUNT(*) as total_today,
             SUM(CASE WHEN status = 'Hadir' THEN 1 ELSE 0 END) as hadir,
             SUM(CASE WHEN status = 'Telat' THEN 1 ELSE 0 END) as telat,
-            SUM(CASE WHEN check_out_time IS NOT NULL THEN 1 ELSE 0 END) as pulang
+            SUM(CASE WHEN jam_pulang IS NOT NULL THEN 1 ELSE 0 END) as pulang
         FROM attendances
-        WHERE date = :today
+        WHERE tanggal = :today
     ");
     $statStmt->execute([':today' => $today]);
     $stats = $statStmt->fetch(PDO::FETCH_ASSOC) ?: [

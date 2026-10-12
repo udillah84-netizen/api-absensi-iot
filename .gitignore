@@ -39,3 +39,6 @@ venv/
 # Temporary / Scratch
 tmp/
 temp/
+
+# AI Agent Specific Guides
+AGENTS.md

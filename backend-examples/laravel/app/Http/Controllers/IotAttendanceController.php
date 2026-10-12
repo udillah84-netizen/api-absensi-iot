@@ -6,6 +6,8 @@ use App\Models\Attendance;
 use App\Models\AttendanceDevice;
 use App\Models\AttendanceScanLog;
 use App\Models\AttendanceSetting;
+use App\Models\IotSetting;
+use App\Models\UnregisteredCard;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -50,10 +52,11 @@ class IotAttendanceController extends Controller
             'scanned_at' => $scannedAt,
         ];
 
-        // 1. Update status online perangkat
+        // 1. Update status online dan heartbeat perangkat
         if ($deviceId) {
             $device = AttendanceDevice::where('device_id', $deviceId)->first();
             if ($device) {
+                $device->increment('scans_today');
                 $device->updateHeartbeat($request->ip());
             }
         }
@@ -69,6 +72,13 @@ class IotAttendanceController extends Controller
         if (!$user) {
             $logData['message'] = 'Kartu / Kode tidak terdaftar';
             $this->saveLog($logData);
+
+            // Rekam ke antrean pendaftaran kartu cepat (Card Enrollment Buffer)
+            try {
+                UnregisteredCard::recordCard($code, $jenis, $deviceId);
+            } catch (\Exception $e) {
+                Log::debug('Gagal mencatat unregistered card: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => false,
@@ -98,7 +108,6 @@ class IotAttendanceController extends Controller
 
         // 3. Ambil Konfigurasi Jam Presensi
         $setting = AttendanceSetting::getForRole($user->role ?? 'siswa');
-        $jamMasukSetting = $setting->jam_masuk ?? '07:00:00';
         $batasTerlambat  = $setting->batas_terlambat ?? '07:30:00';
         $jamPulangSetting = $setting->jam_pulang ?? '14:00:00';
 
@@ -197,7 +206,7 @@ class IotAttendanceController extends Controller
     }
 
     /**
-     * Endpoint Heartbeat: Melaporkan status kesehatan mesin & sinkronisasi jam
+     * Endpoint Heartbeat: Melaporkan status kesehatan mesin, RSSI sinyal, & sinkronisasi jam
      * POST /api/v1/iot/heartbeat
      */
     public function heartbeat(Request $request): JsonResponse
@@ -213,7 +222,12 @@ class IotAttendanceController extends Controller
         $device = AttendanceDevice::where('device_id', $deviceId)->first();
 
         if ($device) {
-            $device->updateHeartbeat($request->ip(), $request->input('fw_version'));
+            $device->updateHeartbeat(
+                $request->ip(),
+                $request->input('fw_version'),
+                $request->input('wifi_rssi'),
+                $request->input('scans_today')
+            );
         }
 
         return response()->json([
@@ -237,27 +251,35 @@ class IotAttendanceController extends Controller
         $deviceId = $request->input('device_id');
         $device = AttendanceDevice::where('device_id', $deviceId)->first();
 
+        $iotSetting = IotSetting::getActive();
         $settingSiswa = AttendanceSetting::getForRole('siswa');
         $settingPegawai = AttendanceSetting::getForRole('pegawai');
 
+        $namaLembaga = $iotSetting->nama_lembaga ?? config('iot.institution_name', 'SMK NEGERI 1 BOGOR');
+        $standbyText = $device->standby_text_override ?? ($iotSetting->standby_text ?? config('iot.standby_text', 'SILAKAN ABSEN'));
+        $tipeSensor = $device->tipe_sensor ?? 'COMBO';
+
         return response()->json([
-            'success'     => true,
-            'server_time' => now()->toIso8601String(),
-            'device'      => [
+            'success'      => true,
+            'nama_lembaga' => $this->formatLcdName($namaLembaga),
+            'tipe_sensor'  => $tipeSensor,
+            'standby_text' => $standbyText,
+            'server_time'  => now()->toIso8601String(),
+            'device'       => [
                 'device_id' => $device->device_id ?? $deviceId,
                 'nama'      => $device->nama ?? 'Mesin Absensi',
                 'lokasi'    => $device->lokasi ?? 'Pintu Utama',
             ],
-            'schedules'   => [
+            'schedules'    => [
                 'siswa' => [
-                    'jam_masuk'       => substr($settingSiswa->jam_masuk, 0, 5),
-                    'batas_terlambat' => substr($settingSiswa->batas_terlambat, 0, 5),
-                    'jam_pulang'      => substr($settingSiswa->jam_pulang, 0, 5),
+                    'jam_masuk'       => substr($settingSiswa->jam_masuk ?? '07:00:00', 0, 5),
+                    'batas_terlambat' => substr($settingSiswa->batas_terlambat ?? '07:30:00', 0, 5),
+                    'jam_pulang'      => substr($settingSiswa->jam_pulang ?? '14:00:00', 0, 5),
                 ],
                 'pegawai' => [
-                    'jam_masuk'       => substr($settingPegawai->jam_masuk, 0, 5),
-                    'batas_terlambat' => substr($settingPegawai->batas_terlambat, 0, 5),
-                    'jam_pulang'      => substr($settingPegawai->jam_pulang, 0, 5),
+                    'jam_masuk'       => substr($settingPegawai->jam_masuk ?? '07:30:00', 0, 5),
+                    'batas_terlambat' => substr($settingPegawai->batas_terlambat ?? '08:00:00', 0, 5),
+                    'jam_pulang'      => substr($settingPegawai->jam_pulang ?? '16:00:00', 0, 5),
                 ],
             ],
         ]);
@@ -288,6 +310,252 @@ class IotAttendanceController extends Controller
             'version'          => $currentVersion,
             'message'          => 'Firmware is up to date',
         ]);
+    }
+
+    /**
+     * Endpoint Data Real-time untuk Live Monitor Dashboard & TV Kiosk
+     * GET /api/v1/iot/monitor/data
+     */
+    public function liveMonitorData(Request $request): JsonResponse
+    {
+        $today = Carbon::today()->toDateString();
+
+        $attendances = Attendance::with('user')
+            ->where('tanggal', $today)
+            ->orderBy('updated_at', 'desc')
+            ->limit(24)
+            ->get();
+
+        $records = $attendances->map(function ($absen) {
+            $user = $absen->user;
+            $nama = $user ? $user->name : 'Pengguna';
+            $kelas = $user ? ($user->department ?? $user->role ?? 'Siswa/Staff') : '-';
+            $foto = $user && isset($user->avatar_url) ? $user->avatar_url : null;
+
+            return [
+                'id'             => $absen->id,
+                'user_id'        => $absen->user_id,
+                'nama'           => $nama,
+                'inisial'        => mb_strtoupper(mb_substr($nama, 0, 1)),
+                'kelas'          => $kelas,
+                'foto'           => $foto,
+                'jam_masuk'      => $absen->jam_masuk ? substr($absen->jam_masuk, 0, 5) : '--:--',
+                'jam_pulang'     => $absen->jam_pulang ? substr($absen->jam_pulang, 0, 5) : '--:--',
+                'status'         => $absen->status ?? 'Hadir',
+                'device_id'      => $absen->device_id_masuk ?? 'GERBANG-01',
+                'time_formatted' => $absen->updated_at ? $absen->updated_at->diffForHumans() : 'Baru saja',
+                'updated_at'     => $absen->updated_at ? $absen->updated_at->toIso8601String() : now()->toIso8601String(),
+            ];
+        });
+
+        // Statistik ringkasan hari ini
+        $totalToday = Attendance::where('tanggal', $today)->count();
+        $totalHadir = Attendance::where('tanggal', $today)->where('status', 'Hadir')->count();
+        $totalTelat = Attendance::where('tanggal', $today)->where('status', 'Telat')->count();
+        $totalPulang = Attendance::where('tanggal', $today)->whereNotNull('jam_pulang')->count();
+
+        return response()->json([
+            'records' => $records,
+            'stats'   => [
+                'total_today' => $totalToday,
+                'hadir'       => $totalHadir,
+                'telat'       => $totalTelat,
+                'pulang'      => $totalPulang,
+                'server_time' => now()->format('H:i:s'),
+                'server_date' => now()->translatedFormat('l, d F Y'),
+            ],
+        ]);
+    }
+
+    /**
+     * Tampilan Halaman Live Monitor Real-time (TV Lobi)
+     * GET /absensi/monitor
+     */
+    public function liveMonitor()
+    {
+        return view('iot.live_monitor');
+    }
+
+    /**
+     * Tampilan Halaman Device Monitoring & Pengaturan IoT (Web Admin)
+     * GET /absensi/devices
+     */
+    public function deviceMonitoring()
+    {
+        return view('iot.device_monitoring');
+    }
+
+    /**
+     * Data Telemetri Perangkat IoT, Status Sinyal, dan Pendaftaran Kartu
+     * GET /api/v1/iot/devices/data
+     */
+    public function deviceMonitoringData(Request $request): JsonResponse
+    {
+        $devices = AttendanceDevice::orderBy('nama', 'asc')->get()->map(function ($d) {
+            $isOnline = $d->isOnline();
+            $lastSeen = $d->last_heartbeat ? $d->last_heartbeat->diffForHumans() : 'Belum pernah';
+
+            return [
+                'id'                    => $d->id,
+                'device_id'             => $d->device_id,
+                'nama'                  => $d->nama,
+                'lokasi'                => $d->lokasi,
+                'token'                 => $d->token,
+                'tipe_sensor'           => $d->tipe_sensor ?? 'COMBO',
+                'is_online'             => $isOnline,
+                'status'                => $isOnline ? 'online' : 'offline',
+                'signal_quality'        => $d->signal_quality,
+                'wifi_rssi'             => $d->wifi_rssi,
+                'scans_today'           => $d->scans_today ?? 0,
+                'standby_text_override' => $d->standby_text_override,
+                'last_heartbeat'        => $d->last_heartbeat ? $d->last_heartbeat->toIso8601String() : null,
+                'last_seen'             => $lastSeen,
+                'ip_address'            => $d->ip_address ?? '-',
+                'firmware_version'      => $d->firmware_version ?? 'v2.0.0',
+            ];
+        });
+
+        $onlineCount = $devices->where('is_online', true)->count();
+        $offlineCount = $devices->where('is_online', false)->count();
+        $totalScans = $devices->sum('scans_today');
+
+        $iotSetting = IotSetting::getActive();
+        $settingSiswa = AttendanceSetting::getForRole('siswa');
+        $settingPegawai = AttendanceSetting::getForRole('pegawai');
+
+        // Ambil 15 kartu terbaru yang belum terdaftar (untuk Enrollment)
+        $unregisteredCards = UnregisteredCard::orderBy('last_scanned_at', 'desc')->limit(15)->get();
+
+        // Ambil daftar pengguna tanpa kartu / seluruh pengguna untuk dropdown assignment
+        $users = User::select('id', 'name', 'role', 'department', 'identifier_number', 'rfid_uid', 'barcode_uid')
+            ->orderBy('name', 'asc')
+            ->limit(500)
+            ->get();
+
+        return response()->json([
+            'summary' => [
+                'total_devices' => $devices->count(),
+                'online'        => $onlineCount,
+                'offline'       => $offlineCount,
+                'total_scans'   => $totalScans,
+            ],
+            'devices'            => $devices,
+            'unregistered_cards' => $unregisteredCards,
+            'users'              => $users,
+            'settings'           => [
+                'nama_lembaga'             => $iotSetting->nama_lembaga,
+                'standby_text'             => $iotSetting->standby_text,
+                'timezone'                 => $iotSetting->timezone,
+                'duplicate_window_seconds' => $iotSetting->duplicate_window_seconds,
+                'schedules'                => [
+                    'siswa' => [
+                        'jam_masuk'       => substr($settingSiswa->jam_masuk ?? '07:00:00', 0, 5),
+                        'batas_terlambat' => substr($settingSiswa->batas_terlambat ?? '07:30:00', 0, 5),
+                        'jam_pulang'      => substr($settingSiswa->jam_pulang ?? '14:00:00', 0, 5),
+                    ],
+                    'pegawai' => [
+                        'jam_masuk'       => substr($settingPegawai->jam_masuk ?? '07:30:00', 0, 5),
+                        'batas_terlambat' => substr($settingPegawai->batas_terlambat ?? '08:00:00', 0, 5),
+                        'jam_pulang'      => substr($settingPegawai->jam_pulang ?? '16:00:00', 0, 5),
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Simpan Pengaturan Profil Lembaga & Jam Absensi
+     * POST /api/v1/iot/settings/save
+     */
+    public function saveSettings(Request $request): JsonResponse
+    {
+        $request->validate([
+            'nama_lembaga'             => 'required|string|max:100',
+            'standby_text'             => 'required|string|max:50',
+            'duplicate_window_seconds' => 'nullable|integer|min:5|max:300',
+            'siswa_masuk'              => 'nullable|string',
+            'siswa_terlambat'          => 'nullable|string',
+            'siswa_pulang'             => 'nullable|string',
+            'pegawai_masuk'            => 'nullable|string',
+            'pegawai_terlambat'        => 'nullable|string',
+            'pegawai_pulang'           => 'nullable|string',
+        ]);
+
+        $setting = IotSetting::getActive();
+        $setting->update([
+            'nama_lembaga'             => $request->input('nama_lembaga'),
+            'standby_text'             => $request->input('standby_text'),
+            'duplicate_window_seconds' => $request->input('duplicate_window_seconds', 30),
+        ]);
+
+        // Simpan jadwal siswa
+        AttendanceSetting::updateOrCreate(
+            ['tipe_user' => 'siswa'],
+            [
+                'jam_masuk'       => $request->input('siswa_masuk', '07:00:00'),
+                'batas_terlambat' => $request->input('siswa_terlambat', '07:30:00'),
+                'jam_pulang'      => $request->input('siswa_pulang', '14:00:00'),
+            ]
+        );
+
+        // Simpan jadwal pegawai
+        AttendanceSetting::updateOrCreate(
+            ['tipe_user' => 'pegawai'],
+            [
+                'jam_masuk'       => $request->input('pegawai_masuk', '07:30:00'),
+                'batas_terlambat' => $request->input('pegawai_terlambat', '08:00:00'),
+                'jam_pulang'      => $request->input('pegawai_pulang', '16:00:00'),
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengaturan lembaga dan jam berhasil disimpan',
+        ]);
+    }
+
+    /**
+     * Daftarkan Kartu Baru ke Pengguna (Card Enrollment)
+     * POST /api/v1/iot/cards/enroll
+     */
+    public function enrollCard(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+            'code'    => 'required|string|max:128',
+            'jenis'   => 'nullable|string|in:RFID,BARCODE',
+        ]);
+
+        $userId = $request->input('user_id');
+        $code = trim($request->input('code'));
+        $jenis = strtoupper($request->input('jenis', 'RFID'));
+
+        $user = User::findOrFail($userId);
+
+        if ($jenis === 'RFID') {
+            $user->rfid_uid = $code;
+        } else {
+            $user->barcode_uid = $code;
+        }
+        $user->save();
+
+        // Hapus dari antrean unregistered cards
+        UnregisteredCard::where('code', $code)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Kartu {$code} berhasil dipasangkan ke {$user->name}",
+        ]);
+    }
+
+    /**
+     * Hapus Kartu dari Antrean Unregistered
+     * DELETE /api/v1/iot/cards/unregistered/{id}
+     */
+    public function deleteUnregisteredCard($id): JsonResponse
+    {
+        UnregisteredCard::destroy($id);
+        return response()->json(['success' => true, 'message' => 'Kartu dihapus dari antrean']);
     }
 
     /**
@@ -330,68 +598,5 @@ class IotAttendanceController extends Controller
         } catch (\Exception $e) {
             Log::warning('Gagal menyimpan attendance_scan_logs: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Endpoint Data Real-time untuk Live Monitor Dashboard & TV Kiosk
-     * GET /api/v1/iot/monitor/data
-     */
-    public function liveMonitorData(Request $request): JsonResponse
-    {
-        $today = Carbon::today()->toDateString();
-
-        $attendances = Attendance::with('user')
-            ->where('date', $today)
-            ->orderBy('updated_at', 'desc')
-            ->limit(24)
-            ->get();
-
-        $records = $attendances->map(function ($absen) {
-            $user = $absen->user;
-            $nama = $user ? $user->name : 'Pengguna';
-            $kelas = $user ? ($user->class_or_department ?? $user->role ?? 'Siswa/Staff') : '-';
-            $foto = $user && isset($user->avatar_url) ? $user->avatar_url : null;
-
-            return [
-                'id'             => $absen->id,
-                'user_id'        => $absen->user_id,
-                'nama'           => $nama,
-                'inisial'        => mb_strtoupper(mb_substr($nama, 0, 1)),
-                'kelas'          => $kelas,
-                'foto'           => $foto,
-                'jam_masuk'      => $absen->check_in_time ? Carbon::parse($absen->check_in_time)->format('H:i') : '--:--',
-                'jam_pulang'     => $absen->check_out_time ? Carbon::parse($absen->check_out_time)->format('H:i') : '--:--',
-                'status'         => $absen->status ?? 'Hadir',
-                'device_id'      => $absen->device_id ?? 'GERBANG-01',
-                'time_formatted' => $absen->updated_at ? $absen->updated_at->diffForHumans() : 'Baru saja',
-                'updated_at'     => $absen->updated_at ? $absen->updated_at->toIso8601String() : now()->toIso8601String(),
-            ];
-        });
-
-        // Statistik ringkasan hari ini
-        $totalHadir = Attendance::where('date', $today)->where('status', 'Hadir')->count();
-        $totalTelat = Attendance::where('date', $today)->where('status', 'Telat')->count();
-        $totalPulang = Attendance::where('date', $today)->whereNotNull('check_out_time')->count();
-
-        return response()->json([
-            'records' => $records,
-            'stats'   => [
-                'total_today' => $attendances->count(),
-                'hadir'       => $totalHadir,
-                'telat'       => $totalTelat,
-                'pulang'      => $totalPulang,
-                'server_time' => now()->format('H:i:s'),
-                'server_date' => now()->translatedFormat('l, d F Y'),
-            ],
-        ]);
-    }
-
-    /**
-     * Tampilan Halaman Live Monitor Real-time
-     * GET /absensi/monitor
-     */
-    public function liveMonitor()
-    {
-        return view('iot.live_monitor');
     }
 }

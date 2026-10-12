@@ -24,11 +24,23 @@ $data = json_decode($rawInput, true);
 
 $deviceId = trim($data['device_id'] ?? '');
 $fwVersion = trim($data['fw_version'] ?? 'v2.0.0');
+$wifiRssi = isset($data['wifi_rssi']) ? (int)$data['wifi_rssi'] : null;
+$scansToday = isset($data['scans_today']) ? (int)$data['scans_today'] : null;
+$ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
 if (!empty($deviceId)) {
     try {
-        $stmt = $pdo->prepare('UPDATE attendance_devices SET status = "online", last_heartbeat = NOW(), firmware_version = ? WHERE device_id = ?');
-        $stmt->execute([$fwVersion, $deviceId]);
+        $stmt = $pdo->prepare('
+            UPDATE attendance_devices 
+            SET status = "online", 
+                last_heartbeat = NOW(), 
+                firmware_version = COALESCE(?, firmware_version),
+                wifi_rssi = COALESCE(?, wifi_rssi),
+                scans_today = COALESCE(?, scans_today),
+                ip_address = COALESCE(?, ip_address)
+            WHERE device_id = ?
+        ');
+        $stmt->execute([$fwVersion, $wifiRssi, $scansToday, $ipAddress, $deviceId]);
     } catch (Exception $e) {}
 }
 
